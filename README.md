@@ -20,7 +20,20 @@ Adapted from the Perl script published by isc.sans.edu at https://isc.sans.edu/c
   chmod +x kipposhield.py
   ```
 
-# Usage
+## Usage
 ```
 ./kipposhield.py kippo.log
 ```
+
+### Example output
+
+```
+cowrie@mypot:~/kippo-pyshield$ ./kipposhield.py /home/cowrie/cowrie/log/cowrie.log.2
+INFO: Found 457 login attempts in the specified log file (/home/cowrie/cowrie/log/cowrie.log.2)
+INFO: Sending all entries to the server
+response is ok
+
+SUCCESS: Sent 75644 bytes worth of data to secure.dshield.org
+
+```
+
