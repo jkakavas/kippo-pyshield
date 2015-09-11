@@ -63,6 +63,8 @@ def send_log(attempts):
         sha1_regex = re.compile(ur'<sha1checksum>([^<]+)<\/sha1checksum>')
         sha1_match = sha1_regex.search(response)
         if sha1_match is None:
+            print 'Could not find sha1checksum in response'
+            print 'Response was {0}'.format(response)
             return (1, 'Could not find sha1checksum in response')
         sha1_local = hashlib.sha1()
         sha1_local.update(log_output)
@@ -72,16 +74,19 @@ def send_log(attempts):
         md5_regex = re.compile(ur'<md5checksum>([^<]+)<\/md5checksum>')
         md5_match = md5_regex.search(response)
         if md5_match is None:
+            print 'Could not find md5checksum in response'
+            print 'Response was {0}'.format(response)
             return (1, 'Could not find md5checksum in response')
         md5_local = hashlib.md5()
         md5_local.update(log_output)
         if md5_match.group(1) != md5_local.hexdigest():
             print '\nERROR: MD5 Mismatch {0} {1} .\n'.format(md5_match.group(1), md5_local.hexdigest())
             return(1,'\nERROR: MD5 Mismatch {0} {1} .\n'.format(md5_match.group(1), md5_local.hexdigest()))
-        print '\nSUCESS: Sent {0} bytes worth of data to secure.dshield.org\n'.format(len(log_output))
-        return(0,'\nSUCESS: Sent {0} bytes worth of data to secure.dshield.org\n'.format(len(log_output)))
+        print '\nSUCCESS: Sent {0} bytes worth of data to secure.dshield.org\n'.format(len(log_output))
+        return(0,'\nSUCCESS: Sent {0} bytes worth of data to secure.dshield.org\n'.format(len(log_output)))
     else:
         print '\nERROR: error {0} .\n'.format(req.status_code)
+        print 'Response was {0}'.format(response)
         return(1,'\nERROR: error {0} .\n'.format(req.status_code))
 
 def analyze_log(logfile_path):
@@ -101,17 +106,16 @@ def analyze_log(logfile_path):
                                  'user':match.group(4),
                                  'pwd':match.group(5)
                                 })
-    print 'Found {0} login attempts in the cowrie/kippo log'.format(len(attempts))
     return attempts
 
 
 def main():
-    attempts = analyze_log(sys.argv[0])
+    attempts = analyze_log(sys.argv[1])
     if len(attempts) == 0:
-        print 'INFO: No login attempts found in the specified log file ({0})'.format(sys.argv[0])
+        print 'INFO: No login attempts found in the specified log file ({0})'.format(sys.argv[1])
         sys.exit(0)
     # Split log entries in chunks of 1000
-    print 'INFO: Found {0} login attempts in the specified log file ({1})'.format(len(attempts),sys.argv[0])
+    print 'INFO: Found {0} login attempts in the specified log file ({1})'.format(len(attempts),sys.argv[1])
     if len(attempts) > 1000:
         print 'INFO: Splitting log entries in chunks of 1000 entries'
         attempts_chunks = [attempts[x:x+1000] for x in xrange(0, len(attempts), 1000)]
