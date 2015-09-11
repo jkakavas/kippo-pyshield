@@ -38,8 +38,13 @@ def send_log(attempts):
     auth_key = ''
     dshield_userid = ''
     log_output = ''
+    # Format login attempts as tab seperated log entries
     for logline in attempts:
         log_output += '{0}\t{1}\t{2}\t{3}\t{4}\t{5}\n'.format(logline['date'],logline['time'],logline['timezone'],logline['source_ip'],logline['user'],logline['pwd'])
+    # The nonce is predefined as explained in the original script :
+    # trying to avoid sending the authentication key in the "clear" but not wanting to
+    # deal with a full digest like exchange. Using a fixed nonce to mix up the limited
+    # userid. 
     nonce = base64.b64decode('ElWO1arph+Jifqme6eXD8Uj+QTAmijAWxX1msbJzXDM=')
     digest = base64.b64encode(hmac.new('{0}{1}'.format(nonce,dshield_userid),base64.b64decode(auth_key),  hashlib.sha256).digest())
     auth_header = 'credentials={0} nonce=ElWO1arph+Jifqme6eXD8Uj+QTAmijAWxX1msbJzXDM= userid={1}'.format(digest, dshield_userid)
@@ -102,7 +107,20 @@ def analyze_log(logfile_path):
 
 def main():
     attempts = analyze_log(sys.argv[0])
-    result_code,result = send_log(attempts)
+    if len(attempts) == 0:
+        print 'INFO: No login attempts found in the specified log file ({0})'.format(sys.argv[0])
+        sys.exit(0)
+    # Split log entries in chunks of 1000
+    print 'INFO: Found {0} login attempts in the specified log file ({1})'.format(len(attempts),sys.argv[0])
+    if len(attempts) > 1000:
+        print 'INFO: Splitting log entries in chunks of 1000 entries'
+        attempts_chunks = [attempts[x:x+1000] for x in xrange(0, len(attempts), 1000)]
+        for chunk in attempts_chunks:
+            print 'INFO: Sending chunk to the server'
+            result_code,result = send_log(chunk)
+    else:
+        print 'INFO: Sending all entries to the server'
+        result_code,result = send_log(attempts)
     sys.exit(result_code)
 
 
