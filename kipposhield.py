@@ -22,7 +22,7 @@
 
 __author__ = "Yiannis Kakavas"
 __license__ = "GPL"
-__version__ = "0.1"
+__version__ = "0.2"
 __email__ = "jkakavas@gmail.com"
 
 import re
@@ -31,7 +31,12 @@ import base64
 import sys
 import hmac
 import hashlib
-
+import datetime
+import pytz
+import tzlocal
+import MySQLdb
+import argparse
+from os import path
 
 
 def send_log(attempts):
@@ -89,33 +94,67 @@ def send_log(attempts):
         print 'Response was {0}'.format(response)
         return(1,'\nERROR: error {0} .\n'.format(req.status_code))
 
-def analyze_log(logfile_path):
-    # We attempt to match log lines like the one below:
-    # 2015-09-09 11:28:09+0300 [SSHService ssh-userauth on HoneyPotTransport,1579,24.39.252.180] login attempt [root/alpine] succeeded
-    regex = re.compile(ur"(2\d\d\d-\d\d-\d\d) (\d\d:\d\d:\d\d)([+-]\d{4}) [^,]+,\d+,([\d.]+)\] login attempt \[([^\/]+)\/([^\]]+)\]")
+def analyze_log(source_type, log_source=None):
     attempts = []
-
-    with open(logfile_path, 'r') as logfile:
-        for line in logfile.readlines():
-            match = regex.search(line.rstrip())
-            if match is not None:
-                attempts.append({'date':match.group(0),
-                                 'time':match.group(1),
-                                 'timezone':match.group(2),
-                                 'source_ip':match.group(3),
-                                 'user':match.group(4),
-                                 'pwd':match.group(5)
-                                })
+    if source_type == 'file':
+        # We attempt to match log lines like the one below:
+        # 2015-09-09 11:28:09+0300 [SSHService ssh-userauth on HoneyPotTransport,1579,24.39.252.180] login attempt [root/alpine] succeeded
+        regex = re.compile(ur"(2\d\d\d-\d\d-\d\d) (\d\d:\d\d:\d\d)([+-]\d{4}) [^,]+,\d+,([\d.]+)\] login attempt \[([^\/]+)\/([^\]]+)\]")
+        with open(logfile_path, 'r') as logfile:
+            for line in logfile.readlines():
+                match = regex.search(line.rstrip())
+                if match is not None:
+                    attempts.append({'date':match.group(0),
+                                     'time':match.group(1),
+                                     'timezone':match.group(2),
+                                     'source_ip':match.group(3),
+                                     'user':match.group(4),
+                                     'pwd':match.group(5)
+                                    })
+    elif source_type == 'db':
+        db_name = ''
+        db_host = ''
+        db_username = ''
+        db_password = ''
+        try:
+            with MySQLdb.connect(host = db_host, user = db_username, passwd = db_password, db = db_name) as con:
+                cur = con.cursor()
+                cur.execute("select auth.timestamp, sessions.ip, auth.username, auth.password from auth inner join sessions on auth.session = sessions.id;")
+                rows = cur.fetchall()
+                timezone = datetime.datetime.now(pytz.timezone(tzlocal.get_localzone().zone)).strftime('%z')
+                for row in rows:
+                    attempts.append({'date':row[0].strftime('%Y-%m-%d'),
+                                     'time':row[0].strftime('%H:%M:%S'),
+                                     'timezone':timezone,
+                                     'source_ip':row[1],
+                                     'user':row[2],
+                                     'pwd':row[3]
+                                    })
+        except Exception, e:
+            print 'ERROR: Error connecting to the database. Error was : {0}'.format(e)
+            
     return attempts
 
 
 def main():
-    attempts = analyze_log(sys.argv[1])
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-db', action='store_true', dest='logtype_db',
+                        help='Get login attempts from a database')
+    parser.add_argument('-f', action='store', dest='logfile',
+                        help='Get login attemtps from a log file')
+    args = parser.parse_args()
+    if args.logtype_db:
+        attempts = analyze_log('db')
+    elif args.logfile and path.exists(args.logfile):
+        attempts = analyze_log('file', args.logfile)
+    else:
+        parser.print_help()
+        sys.exit(1)
     if len(attempts) == 0:
-        print 'INFO: No login attempts found in the specified log file ({0})'.format(sys.argv[1])
+        print 'INFO: No login attempts found in the specified log source '
         sys.exit(0)
     # Split log entries in chunks of 1000
-    print 'INFO: Found {0} login attempts in the specified log file ({1})'.format(len(attempts),sys.argv[1])
+    print 'INFO: Found {0} login attempts in the specified log source'.format(len(attempts))
     if len(attempts) > 1000:
         print 'INFO: Splitting log entries in chunks of 1000 entries'
         attempts_chunks = [attempts[x:x+1000] for x in xrange(0, len(attempts), 1000)]
@@ -126,7 +165,6 @@ def main():
         print 'INFO: Sending all entries to the server'
         result_code,result = send_log(attempts)
     sys.exit(result_code)
-
 
 if __name__ == "__main__":
     main()
