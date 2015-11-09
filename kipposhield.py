@@ -22,7 +22,7 @@
 
 __author__ = "Yiannis Kakavas"
 __license__ = "GPL"
-__version__ = "0.2"
+__version__ = "0.3"
 __email__ = "jkakavas@gmail.com"
 
 import re
