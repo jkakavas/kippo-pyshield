@@ -117,8 +117,7 @@ def analyze_log(source_type, log_source=None):
         db_username = ''
         db_password = ''
         try:
-            with MySQLdb.connect(host = db_host, user = db_username, passwd = db_password, db = db_name) as con:
-                cur = con.cursor()
+            with MySQLdb.connect(host = db_host, user = db_username, passwd = db_password, db = db_name) as cur:
                 cur.execute("select auth.timestamp, sessions.ip, auth.username, auth.password from auth inner join sessions on auth.session = sessions.id;")
                 rows = cur.fetchall()
                 timezone = datetime.datetime.now(pytz.timezone(tzlocal.get_localzone().zone)).strftime('%z')
