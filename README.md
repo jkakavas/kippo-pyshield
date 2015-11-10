@@ -36,10 +36,11 @@ optional arguments:
 
 ```
 
-kipposhield marks the timestamp of the last log entry it has sent to ICS in a
-text file in the current directory in order to not send duplicate entries. If 
-there is a need to bypass this, one can edit or remove the last_sent file from 
-the current directory. 
+By default, kipposhield marks the timestamp of the last log entry it has sent to ISC in a text file in the same directory as kipposhield.py in order to not send duplicate entries. 
+
+This allows kipposhield.py to be run as a cronjob every few hours, sending only the new entries to ISC.
+
+If there is a need to bypass this, one can edit or remove the last_sent file from the current directory. 
 
 ### Example output
 
