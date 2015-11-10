@@ -36,14 +36,20 @@ optional arguments:
 
 ```
 
+kipposhield marks the timestamp of the last log entry it has sent to ICS in a
+text file in the current directory in order to not send duplicate entries. If 
+there is a need to bypass this, one can edit or remove the last_sent file from 
+the current directory. 
+
 ### Example output
 
 ```
 cowrie@mypot:~/kippo-pyshield$ ./kipposhield.py -f /home/cowrie/cowrie/log/cowrie.log.2
-INFO: Found 457 login attempts in the specified log source
+INFO: analyzing and sending entries that occured later than 2015-11-10 11:16:46
+INFO: Found 2 login attempts in the specified log source
 INFO: Sending all entries to the server
 response is ok
 
-SUCCESS: Sent 75644 bytes worth of data to secure.dshield.org
+SUCCESS: Sent 101 bytes worth of data to secure.dshield.org
 
 ```

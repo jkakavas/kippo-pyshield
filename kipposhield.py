@@ -22,7 +22,7 @@
 
 __author__ = "Yiannis Kakavas"
 __license__ = "GPL"
-__version__ = "0.3"
+__version__ = "0.4"
 __email__ = "jkakavas@gmail.com"
 
 import re
@@ -32,12 +32,12 @@ import sys
 import hmac
 import hashlib
 import datetime
+import time
 import pytz
 import tzlocal
 import MySQLdb
 import argparse
 from os import path
-
 
 def send_log(attempts):
     auth_key = ''
@@ -94,23 +94,24 @@ def send_log(attempts):
         print 'Response was {0}'.format(response)
         return(1,'\nERROR: error {0} .\n'.format(req.status_code))
 
-def analyze_log(source_type, log_source=None):
+def analyze_log(source_type, log_source=None, last_sent=None):
     attempts = []
     if source_type == 'file':
         # We attempt to match log lines like the one below:
         # 2015-09-09 11:28:09+0300 [SSHService ssh-userauth on HoneyPotTransport,1579,24.39.252.180] login attempt [root/alpine] succeeded
         regex = re.compile(ur"(2\d\d\d-\d\d-\d\d) (\d\d:\d\d:\d\d)([+-]\d{4}) [^,]+,\d+,([\d.]+)\] login attempt \[([^\/]+)\/([^\]]+)\]")
-        with open(logfile_path, 'r') as logfile:
+        with open(log_source, 'r') as logfile:
             for line in logfile.readlines():
                 match = regex.search(line.rstrip())
                 if match is not None:
-                    attempts.append({'date':match.group(0),
-                                     'time':match.group(1),
-                                     'timezone':match.group(2),
-                                     'source_ip':match.group(3),
-                                     'user':match.group(4),
-                                     'pwd':match.group(5)
-                                    })
+                    if last_sent is None or last_sent<datetime.datetime.strptime('{0} {1}'.format(match.group(1),match.group(2)),"%Y-%m-%d %H:%M:%S"):
+                        attempts.append({'date':match.group(1),
+                                         'time':match.group(2),
+                                         'timezone':match.group(3),
+                                         'source_ip':match.group(4),
+                                         'user':match.group(5),
+                                         'pwd':match.group(6)
+                                        })
     elif source_type == 'db':
         db_name = ''
         db_host = ''
@@ -118,7 +119,10 @@ def analyze_log(source_type, log_source=None):
         db_password = ''
         try:
             with MySQLdb.connect(host = db_host, user = db_username, passwd = db_password, db = db_name) as cur:
-                cur.execute("select auth.timestamp, sessions.ip, auth.username, auth.password from auth inner join sessions on auth.session = sessions.id;")
+                if last_sent is not None:
+                    cur.execute("select auth.timestamp, sessions.ip, auth.username, auth.password from auth inner join sessions on auth.session = sessions.id where auth.timestamp > \"{0}\";".format(last_sent.strftime('%Y-%m-%d %H:%M:%S')))
+                else:
+                    cur.execute("select auth.timestamp, sessions.ip, auth.username, auth.password from auth inner join sessions on auth.session = sessions.id;")
                 rows = cur.fetchall()
                 timezone = datetime.datetime.now(pytz.timezone(tzlocal.get_localzone().zone)).strftime('%z')
                 for row in rows:
@@ -131,9 +135,20 @@ def analyze_log(source_type, log_source=None):
                                     })
         except Exception, e:
             print 'ERROR: Error connecting to the database. Error was : {0}'.format(e)
-            
+    if len(attempts)>0:
+        mark_last_sent("{0} {1}".format(attempts[-1]['date'], attempts[-1]['time']))
     return attempts
 
+def get_last_sent():
+    try:
+        with open('last_sent','r') as f:
+            return datetime.datetime.strptime(f.readlines()[0],"%Y-%m-%d %H:%M:%S")
+    except:
+        return None
+ 
+def mark_last_sent(dt):
+    with open('last_sent','w+') as f:
+        f.write(dt)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -142,10 +157,13 @@ def main():
     parser.add_argument('-f', action='store', dest='logfile',
                         help='Get login attemtps from a log file')
     args = parser.parse_args()
+    last_sent = get_last_sent()
+    if last_sent is not None:
+        print 'INFO: analyzing and sending entries that occured later than {0}'.format(last_sent)
     if args.logtype_db:
-        attempts = analyze_log('db')
+        attempts = analyze_log('db', None, last_sent)
     elif args.logfile and path.exists(args.logfile):
-        attempts = analyze_log('file', args.logfile)
+        attempts = analyze_log('file', args.logfile, last_sent)
     else:
         parser.print_help()
         sys.exit(1)
