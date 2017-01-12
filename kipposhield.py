@@ -54,8 +54,7 @@ def send_log(attempts):
     digest = base64.b64encode(hmac.new('{0}{1}'.format(nonce,dshield_userid),base64.b64decode(auth_key),  hashlib.sha256).digest())
     auth_header = 'credentials={0} nonce=ElWO1arph+Jifqme6eXD8Uj+QTAmijAWxX1msbJzXDM= userid={1}'.format(digest, dshield_userid)
     headers = {'X-ISC-Authorization': auth_header,
-              'Content-Type':'text/plain',
-              'Content-Length':len(log_output)}
+              'Content-Type':'text/plain'}
     req = requests.request(method ='PUT',
                            url = 'https://secure.dshield.org/api/file/sshlog',
                            headers = headers,
